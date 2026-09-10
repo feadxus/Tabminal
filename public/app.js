@@ -1,11 +1,11 @@
-import { Terminal } from 'https://cdn.jsdelivr.net/npm/@xterm/xterm@6.1.0-beta.197/+esm';
-import { FitAddon } from 'https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.12.0-beta.197/+esm';
-import { WebLinksAddon } from 'https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.13.0-beta.197/+esm';
-import { CanvasAddon } from 'https://cdn.jsdelivr.net/npm/@xterm/addon-canvas@0.8.0-beta.48/+esm';
-import { SearchAddon } from 'https://cdn.jsdelivr.net/npm/@xterm/addon-search@0.17.0-beta.197/+esm';
-import { ProgressAddon } from 'https://cdn.jsdelivr.net/npm/@xterm/addon-progress@0.3.0-beta.197/+esm';
-import { LigaturesAddon } from 'https://cdn.jsdelivr.net/npm/@xterm/addon-ligatures@0.11.0-beta.197/+esm';
-import DOMPurify from 'https://cdn.jsdelivr.net/npm/dompurify@3.3.3/+esm';
+import { Terminal } from '/modules/xterm.js';
+import { FitAddon } from '/modules/addon-fit.js';
+import { WebLinksAddon } from '/modules/addon-web-links.js';
+import { CanvasAddon } from '/modules/addon-canvas.js';
+import { SearchAddon } from '/modules/addon-search.js';
+import { ProgressAddon } from '/modules/addon-progress.js';
+import { LigaturesAddon } from '/modules/addon-ligatures.js';
+import DOMPurify from '/modules/dompurify.js';
 
 const LOCAL_MODULE_VERSION = new URL(import.meta.url).search;
 const {
