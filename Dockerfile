@@ -1,11 +1,11 @@
 FROM node:latest
 
-# 1️⃣ 声明架构变量（Docker Buildx 自动注入为 amd64 或 arm64）
+# 1️⃣ 声明架构变量(Docker Buildx 自动注入为 amd64 或 arm64)
 ARG TARGETARCH
 
 WORKDIR /app
 
-# 2️⃣ 安装原生物料编译（node-pty 必须）、Python/Gtk/Cairo 开发依赖包及 OpenSSH 服务
+# 2️⃣ 安装原生物料编译(node-pty 必须)、Python/Gtk/Cairo 开发依赖包及 OpenSSH 服务
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-dev \
@@ -62,7 +62,7 @@ COPY authorized_keys /root/.ssh/authorized_keys
 
 RUN chmod 600 /root/.ssh/authorized_keys
 
-# 4️⃣ 优雅安装 uv（直接从官方镜像提取二进制，自动适配多架构）
+# 4️⃣ 优雅安装 uv(直接从官方镜像提取二进制，自动适配多架构)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # 5️⃣ 动态下载对应架构的 cloudflared 软件包
@@ -85,7 +85,7 @@ RUN case "${TARGETARCH}" in \
 COPY package*.json ./
 RUN npm install
 
-# 8️⃣ 复制剩余全部源码（包含 entrypoint.sh）
+# 8️⃣ 复制剩余全部源码(包含 entrypoint.sh)
 COPY . .
 
 # 9️⃣ 给入口脚本赋予执行权限
@@ -172,5 +172,5 @@ EXPOSE 12345 9846
 # 设置脚本为容器入口
 ENTRYPOINT ["/app/entrypoint.sh"]
 
-# 默认 CMD 参数（如果 docker-compose 没有重写 command，就会用这个默认值）
+# 默认 CMD 参数(如果 docker-compose 没有重写 command，就会用这个默认值)
 CMD ["tabminal", "--host", "0.0.0.0", "--port", "9846"]
