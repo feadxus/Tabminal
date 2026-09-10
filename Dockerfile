@@ -137,4 +137,6 @@ EXPOSE 22 9846
 
 # 设置脚本为容器入口
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["tabminal", "--help"]
+
+# 默认 CMD 参数（如果 docker-compose 没有重写 command，就会用这个默认值）
+CMD ["tabminal", "--host", "0.0.0.0", "--port", "9846"]
