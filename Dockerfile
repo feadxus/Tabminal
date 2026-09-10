@@ -17,18 +17,50 @@ RUN apt-get update && apt-get install -y \
     libcairo2-dev \
     gir1.2-gtk-3.0 \
     make \
+    age \
     g++ \
     curl \
     direnv \
     openssh-server \
     openssh-client \
+    unzip \
+    zip \
+    tar \
+    gzip \
+    bzip2 \
+    xz-utils \
+    lzma \
+    iproute2 \
+    knot \
+    knot-dnsutils \
+    nmap \
+    netcat-openbsd \
+    socat \
+    tcpdump \
+    tshark \
+    wireguard-tools \
+    iputils-ping \
+    traceroute \
+    mtr \
+    wget \
+    dnsutils \
+    vim-nox \
+    git \
+    htop \
+    screen \
+    neofetch \
+    tree \
+    jq \
     && rm -rf /var/lib/apt/lists/*
 
-# 3️⃣ 预配置 SSH 运行环境（允许 root 登录与密码/密钥认证）
-RUN mkdir -p /var/run/sshd && \
-    mkdir -p /root/.ssh && \
-    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
-    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+# 3️⃣ 配置 SSH 目录 / 密钥及权限(SSH 对文件权限要求极严,必须为 700 / 600)
+RUN mkdir -p /var/run/sshd /root/.ssh && \
+    chmod 700 /root/.ssh
+
+COPY sshd_config /etc/ssh/sshd_config
+COPY authorized_keys /root/.ssh/authorized_keys
+
+RUN chmod 600 /root/.ssh/authorized_keys
 
 # 4️⃣ 优雅安装 uv（直接从官方镜像提取二进制，自动适配多架构）
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -119,6 +151,8 @@ RUN uv python install 3.12 && \
         mitmproxy \
         httpx \
         google-api-python-client \
+        google-auth-oauthlib \
+        bcc \
         browser-use \
         PyGObject && \
     rm -rf /root/.cache/uv
@@ -132,8 +166,8 @@ RUN npm run build && npm cache clean --force
 # 1️⃣4️⃣ 全局软链接二进制文件
 RUN npm link
 
-# 暴露 SSH 22 端口和 Tabminal 9846 端口
-EXPOSE 22 9846
+# 暴露 SSH 12345 端口和 Tabminal 9846 端口
+EXPOSE 12345 9846
 
 # 设置脚本为容器入口
 ENTRYPOINT ["/app/entrypoint.sh"]
