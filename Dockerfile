@@ -1,23 +1,31 @@
 FROM node:latest
 
-# 必须在此处声明 TARGETARCH，Docker Buildx 会自动将其填充为 amd64 或 arm64
+# 1️⃣ 声明架构变量
 ARG TARGETARCH
 
 WORKDIR /app
 
-ARG TABMINAL_NPM_SPEC=tabminal
+# 2️⃣ 安装原生物料编译所需的系统依赖（node-pty 必须）
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# 1️⃣ 动态下载对应架构的 cloudflared 软件包 (cloudflared-linux-amd64.deb / cloudflared-linux-arm64.deb)
+# 3️⃣ 动态下载对应架构的 cloudflared 软件包
 RUN curl -L --output cloudflared.deb "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${TARGETARCH}.deb" && \
     dpkg -i cloudflared.deb && \
     rm cloudflared.deb
 
-# 2️⃣ 安装全局 Tabminal
-RUN npm install -g "${TABMINAL_NPM_SPEC}"
+# 4️⃣ 复制当前项目源码并安装依赖
+COPY package*.json ./
+RUN npm install
 
-# 3️⃣ 🚀 核心: 离线化自动下载与注入步骤
-RUN TABMINAL_PATH=$(node -e 'console.log(require.resolve("tabminal/package.json"))' | xargs dirname) && \
-    PUBLIC_DIR="${TABMINAL_PATH}/public" && \
+COPY . .
+
+# 5️⃣ 🚀 核心：离线静态资源自动化下载与注入
+RUN PUBLIC_DIR="/app/public" && \
     MODULES_DIR="${PUBLIC_DIR}/modules" && \
     mkdir -p "${MODULES_DIR}" && \
     \
@@ -59,6 +67,9 @@ RUN TABMINAL_PATH=$(node -e 'console.log(require.resolve("tabminal/package.json"
     # 替换 styles.css 中的 xterm.css
     sed -i "s|@import url('https://cdn.jsdelivr.net/npm/@xterm/xterm@[^']*/css/xterm.css');|@import url('/modules/xterm.css');|g" "${PUBLIC_DIR}/styles.css"
 
+# 全局软链接二进制文件
+RUN npm link
+
 EXPOSE 9846
-ENTRYPOINT ["tabminal"]
+ENTRYPOINT ["node", "bin/tabminal.js"]
 CMD ["--help"]
