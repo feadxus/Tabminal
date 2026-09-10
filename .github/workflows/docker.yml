@@ -96,6 +96,42 @@ jobs:
           done
           echo "Warning: Artifact not found on npm, falling back to latest npm package."
 
+      # 🔍【新增步骤 1】先在本地构建一个测试镜像（不推送到 Docker Hub）
+      - name: Build local container for testing
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true # 👈 关键：允许在接下来的步骤中直接用 docker run 运行它
+          tags: tabminal-test:local
+          build-args: |
+            TABMINAL_NPM_SPEC=${{ github.event_name == 'workflow_dispatch' && 'tabminal' || steps.npm.outputs.package_spec }}
+          cache-from: type=gha
+
+      # 🔍【新增步骤 2】让测试镜像后台运行 5 秒钟，检查它会不会报 MODULE_NOT_FOUND 错误
+      - name: Test container startup (Smoke Test)
+        run: |
+          echo "=== 启动临时容器测试 ==="
+          docker run --name test-container -d tabminal-test:local --help
+          
+          # 让 Node.js 跑 5 秒钟，以便它加载文件结构
+          sleep 5
+          
+          echo "=== 打印容器日志进行校验 ==="
+          docker logs test-container
+          
+          # 核心判定：如果日志里包含任何找不到模块的错误，就直接熔断报错，中断发布
+          if docker logs test-container 2>&1 | grep -qE "Cannot find module|Error"; then
+            echo "❌ 冒烟测试失败：检测到文件缺失或启动错误！"
+            docker rm -f test-container
+            exit 1
+          fi
+          
+          echo "✅ 冒烟测试通过：容器运行正常，未发现找不到模块的错误。"
+          docker rm -f test-container
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
