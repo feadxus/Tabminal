@@ -32,7 +32,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          # 1️⃣ 修改：指向你自己的 Docker Hub 用户名
+          # 1️⃣ 修改：指向你自己的 Docker Hub 用户名 
           images: ${{ secrets.DOCKERHUB_USERNAME }}/tabminal
           tags: |
             type=ref,event=branch
