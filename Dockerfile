@@ -48,7 +48,6 @@ RUN apt-get update && apt-get install -y \
     git \
     htop \
     screen \
-    neofetch \
     tree \
     jq \
     && rm -rf /var/lib/apt/lists/*
