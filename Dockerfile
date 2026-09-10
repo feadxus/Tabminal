@@ -1,5 +1,8 @@
 FROM node:latest
 
+# 自动注入构建目标架构 (amd64 / arm64)
+ARG TARGETARCH
+
 WORKDIR /app
 
 ARG TABMINAL_NPM_SPEC=tabminal
