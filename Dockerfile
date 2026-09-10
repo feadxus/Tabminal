@@ -114,7 +114,7 @@ RUN uv python install 3.12 && \
         pandas \
         scapy \
         "litellm[proxy]" \
-        "huggingface_hub[cli]" \
+        "huggingface_hub" \
         hf_transfer \
         mitmproxy \
         httpx \
