@@ -62,7 +62,7 @@ COPY authorized_keys /root/.ssh/authorized_keys
 
 RUN chmod 600 /root/.ssh/authorized_keys
 
-# 4️⃣ 优雅安装 uv(直接从官方镜像提取二进制，自动适配多架构)
+# 4️⃣ 优雅安装 uv(直接从官方镜像提取二进制,自动适配多架构)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # 5️⃣ 动态下载对应架构的 cloudflared 软件包
@@ -172,5 +172,5 @@ EXPOSE 12345 9846
 # 设置脚本为容器入口
 ENTRYPOINT ["/app/entrypoint.sh"]
 
-# 默认 CMD 参数(如果 docker-compose 没有重写 command，就会用这个默认值)
+# 默认 CMD 参数(如果 docker-compose 没有重写 command,就会用这个默认值)
 CMD ["tabminal", "--host", "0.0.0.0", "--port", "9846"]
