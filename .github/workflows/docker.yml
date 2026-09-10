@@ -16,6 +16,18 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
 
+      # 🧹 清理 Runner 上无用的软件包以腾出 20G+ 磁盘空间
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: false
+          swap-storage: true
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
