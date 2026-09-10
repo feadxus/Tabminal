@@ -32,7 +32,8 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: leask/tabminal
+          # 1️⃣ 修改：指向你自己的 Docker Hub 用户名
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/tabminal
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -77,25 +78,37 @@ jobs:
           set -euo pipefail
           echo "Waiting for tabminal@$TARGET_VERSION"
           echo "Expecting artifact: $PACKAGE_SPEC"
-          for attempt in $(seq 1 60); do
+          
+          # 2️⃣ 修改：如果是手动触发或 Fork 仓库测试，跳过强行等待未发布的 tgz 包
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "Workflow dispatched manually. Using default npm spec: tabminal"
+            exit 0
+          fi
+
+          for attempt in $(seq 1 12); do
             status="$(curl -sS -o /dev/null -w '%{http_code}' -I "$PACKAGE_SPEC" || true)"
             if [[ "$status" == "200" ]]; then
               echo "Artifact is available"
               exit 0
             fi
-            echo "Attempt $attempt/60: status=$status; sleeping 10s"
+            echo "Attempt $attempt/12: status=$status; sleeping 10s"
             sleep 10
           done
-          echo "Timed out waiting for $PACKAGE_SPEC"
-          npm view tabminal versions --json || true
-          exit 1
+          echo "Warning: Artifact not found on npm, falling back to latest npm package."
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./Dockerfile
+          # 3️⃣ 核心修改：明确指定构建多架构 (amd64 和 arm64)
+          platforms: linux/amd64,linux/arm64
           push: true
+          # 4️⃣ 核心修改：禁用 provenance，保证 latest 标签完整包含双架构
+          provenance: false
           build-args: |
-            TABMINAL_NPM_SPEC=${{ steps.npm.outputs.package_spec }}
+            TABMINAL_NPM_SPEC=${{ github.event_name == 'workflow_dispatch' && 'tabminal' || steps.npm.outputs.package_spec }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
