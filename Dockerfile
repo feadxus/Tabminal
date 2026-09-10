@@ -1,11 +1,11 @@
 FROM node:latest
 
-# 1️⃣ 声明架构变量（Docker Buildx 自动注入为 amd64 或 arm64）
+# 1️⃣ 声明架构变量(Docker Buildx 自动注入为 amd64 或 arm64)
 ARG TARGETARCH
 
 WORKDIR /app
 
-# 2️⃣ 安装原生物料编译（node-pty 必须）、Python/Gtk/Cairo 开发依赖包及 OpenSSH 服务
+# 2️⃣ 安装原生物料编译(node-pty 必须)、Python/Gtk/Cairo 开发依赖包及 OpenSSH 服务
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-dev \
@@ -24,13 +24,13 @@ RUN apt-get update && apt-get install -y \
     openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
-# 3️⃣ 预配置 SSH 运行环境（允许 root 登录与密码/密钥认证）
+# 3️⃣ 预配置 SSH 运行环境(允许 root 登录与密码/密钥认证)
 RUN mkdir -p /var/run/sshd && \
     mkdir -p /root/.ssh && \
     sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
     sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
-# 4️⃣ 优雅安装 uv（直接从官方镜像提取二进制，自动适配多架构）
+# 4️⃣ 优雅安装 uv(直接从官方镜像提取二进制，自动适配多架构)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # 5️⃣ 动态下载对应架构的 cloudflared 软件包
@@ -53,7 +53,7 @@ RUN case "${TARGETARCH}" in \
 COPY package*.json ./
 RUN npm install
 
-# 8️⃣ 复制剩余全部源码（包含 entrypoint.sh）
+# 8️⃣ 复制剩余全部源码(包含 entrypoint.sh)
 COPY . .
 
 # 9️⃣ 给入口脚本赋予执行权限
