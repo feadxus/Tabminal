@@ -1,31 +1,65 @@
 FROM node:latest
 
-# 1️⃣ 声明架构变量 
+# 1️⃣ 声明架构变量（Docker Buildx 自动注入为 amd64 或 arm64）
 ARG TARGETARCH
 
 WORKDIR /app
 
-# 2️⃣ 安装原生物料编译所需的系统依赖（node-pty 必须）
+# 2️⃣ 安装原生物料编译（node-pty 必须）、Python/Gtk/Cairo 开发依赖包及 OpenSSH 服务
 RUN apt-get update && apt-get install -y \
     python3 \
+    python3-dev \
+    build-essential \
+    pkg-config \
+    libgirepository1.0-dev \
+    libgirepository-2.0-dev \
+    gir1.2-gtk-4.0 \
+    libcairo2-dev \
+    gir1.2-gtk-3.0 \
     make \
     g++ \
     curl \
+    direnv \
+    openssh-server \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
-# 3️⃣ 动态下载对应架构的 cloudflared 软件包
+# 3️⃣ 预配置 SSH 运行环境（允许 root 登录与密码/密钥认证）
+RUN mkdir -p /var/run/sshd && \
+    mkdir -p /root/.ssh && \
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+# 4️⃣ 优雅安装 uv（直接从官方镜像提取二进制，自动适配多架构）
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# 5️⃣ 动态下载对应架构的 cloudflared 软件包
 RUN curl -L --output cloudflared.deb "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${TARGETARCH}.deb" && \
     dpkg -i cloudflared.deb && \
     rm cloudflared.deb
 
-# 4️⃣ 复制项目名录并提前安装依赖
+# 6️⃣ 🚀 动态判断架构并安装 VeraCrypt Console
+RUN case "${TARGETARCH}" in \
+        "amd64") VERA_ARCH="amd64" ;; \
+        "arm64") VERA_ARCH="arm64" ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+    esac && \
+    VERA_DEB="veracrypt-console-1.26.29-Debian-13-${VERA_ARCH}.deb" && \
+    curl -L --output "${VERA_DEB}" "https://github.com/veracrypt/VeraCrypt/releases/download/VeraCrypt_1.26.29/${VERA_DEB}" && \
+    dpkg -i "${VERA_DEB}" || apt-get install -f -y && \
+    rm -f "${VERA_DEB}"
+
+# 7️⃣ 复制项目目录并提前安装 Node 依赖
 COPY package*.json ./
 RUN npm install
 
-# 5️⃣ 复制剩余全部源码
+# 8️⃣ 复制剩余全部源码（包含 entrypoint.sh）
 COPY . .
 
-# 6️⃣ 🚀 核心：离线静态资源自动化下载与注入（调整到 build 之前，确保被打包工具捕获）
+# 9️⃣ 给入口脚本赋予执行权限
+RUN chmod +x /app/entrypoint.sh
+
+# 🔟 离线静态资源自动化下载与注入
 RUN PUBLIC_DIR="/app/public" && \
     MODULES_DIR="${PUBLIC_DIR}/modules" && \
     mkdir -p "${MODULES_DIR}" && \
@@ -55,17 +89,51 @@ RUN PUBLIC_DIR="/app/public" && \
     sed -i "s|https://cdn.jsdelivr.net/npm/monaco-editor@[^/]*/min/vs/loader.js|/modules/vs/loader.js|g" "${PUBLIC_DIR}/index.html" && \
     sed -i "s|@import url('https://cdn.jsdelivr.net/npm/@xterm/xterm@[^']*/css/xterm.css');|@import url('/modules/xterm.css');|g" "${PUBLIC_DIR}/styles.css"
 
-# 7️⃣ 编译打包（把已经替换好本地引用的源码，完好地锁进发布目录）
+# 1️⃣ 🐍 配置 Python 3.12 虚拟环境并使用 uv 一键预装全套依赖
+ENV VIRTUAL_ENV=/root/.python-env
+RUN uv python install 3.12 && \
+    uv venv $VIRTUAL_ENV && \
+    uv pip install \
+        "requests[socks]" \
+        google_auth_oauthlib \
+        ruamel.yaml \
+        playwright \
+        archivebox \
+        dnspython \
+        pyperclip \
+        asciidoc \
+        httpstat \
+        aiofiles \
+        watchdog \
+        schedule \
+        PySocks \
+        pyyaml \
+        geoip2 \
+        yt-dlp \
+        pytest \
+        pandas \
+        scapy \
+        "litellm[proxy]" \
+        "huggingface_hub[cli]" \
+        hf_transfer \
+        mitmproxy \
+        httpx \
+        google-api-python-client \
+        browser-use \
+        PyGObject
+
+# 2️⃣ 将 Python 虚拟环境加入 PATH
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# 3️⃣ 编译 Node 打包工具产物
 RUN npm run build
 
-# 8️⃣ 全局软链接二进制文件
+# 4️⃣ 全局软链接二进制文件
 RUN npm link
 
-# Expose the default port
-EXPOSE 9846
+# 暴露 SSH 22 端口和 Tabminal 9846 端口
+EXPOSE 22 9846
 
-# Set the entrypoint to the Tabminal CLI
-ENTRYPOINT ["tabminal"]
-
-# Default command (can be overridden)
-CMD ["--help"]
+# 设置脚本为容器入口
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["tabminal", "--help"]
