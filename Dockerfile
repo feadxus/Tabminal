@@ -24,6 +24,8 @@ RUN npm install
 
 COPY . .
 
+RUN npm run build
+
 # 5️⃣ 🚀 核心：离线静态资源自动化下载与注入
 RUN PUBLIC_DIR="/app/public" && \
     MODULES_DIR="${PUBLIC_DIR}/modules" && \
