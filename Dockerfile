@@ -241,6 +241,7 @@ RUN uv python install 3.12 && \
         yt-dlp \
         pytest \
         pandas \
+        cython \
         scapy \
         "litellm[proxy]" \
         huggingface_hub \
