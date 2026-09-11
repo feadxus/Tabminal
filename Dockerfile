@@ -96,8 +96,8 @@ RUN curl -fLo /root/.vim/autoload/plug.vim --create-dirs \
 # 3. 复制配置好的 .vimrc 到容器根目录
 COPY .vimrc /root/.vimrc
 
-# 4. 在 Docker 构建阶段自动预装所有 Vim 插件(静默安装并自动退出)
-RUN vim +PlugInstall +qall
+# 4. 忽略 colorscheme 加载失败的错误并自动预装所有 Vim 插件
+RUN vim -es -u /root/.vimrc -c "PlugInstall" -c "qa!" || true
 
 # ==========================================
 # 2. 配置 Zsh + Oh My Zsh + 亮眼高亮与自动补全插件
