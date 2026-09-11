@@ -35,9 +35,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-server \
     openssh-client \
     netcat-openbsd \
+    knot-dnsutils \
     dnsutils \
     iputils-ping \
     traceroute \
+    net-tools \
     iproute2 \
     tcpdump \
     tshark \
@@ -73,7 +75,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && echo "$TZ" > /etc/timezone \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
-    && sed -i -e 's/# zh_CN.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
+    && sed -i -e 's/# zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/' /etc/locale.gen \
     && locale-gen \
     && update-ca-certificates \
     # 5. 彻底清理缓存
