@@ -5,7 +5,7 @@ ARG TARGETARCH
 
 WORKDIR /app
 
-# 1. 在 RUN 之前全局声明时区和非交互模式
+# 1. 在 RUN 之前全局声明时区和非交互模式 
 ENV TZ=Australia/Perth \
     DEBIAN_FRONTEND=noninteractive
 
