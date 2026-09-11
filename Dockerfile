@@ -123,12 +123,13 @@ RUN git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.
 RUN sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/g' ~/.zshrc && \
     sed -i 's/ZSH_THEME="robbyrussell"/ZSH_THEME="ys"/g' ~/.zshrc
 
-# 5. 设置 zsh 为默认 Shell
-SHELL ["/bin/zsh", "-c"]
+# 5. 彻底将 root 用户的默认 Shell 更改为 zsh (修改 /etc/passwd)
+RUN chsh -s /bin/zsh root
+
+# 6. 保留环境变量 (供 tmux、screen 或第三方 CLI 工具识别)
 ENV SHELL=/bin/zsh
 
 # 多架构自动下载 eza
-ARG TARGETARCH
 RUN case "${TARGETARCH}" in \
         "amd64") EZA_ARCH="x86_64-unknown-linux-gnu" ;; \
         "arm64") EZA_ARCH="aarch64-unknown-linux-gnu" ;; \
@@ -151,10 +152,10 @@ COPY authorized_keys /root/.ssh/authorized_keys
 RUN chmod 600 /root/.ssh/authorized_keys
 
 
-# 5️⃣ 使用官方脚本一键安装 uv (自动适配 amd64 / arm64)
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-# 仅配置 uv 及其全局工具所在的标准路径
-ENV PATH="/root/.local/bin:$PATH"
+# 5️⃣ 从官方二进制镜像直接复制 uv (自动适配 amd64 / arm64)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# 强行在构建阶段校验
+RUN uv --version
 
 
 # 6️⃣ 动态下载对应架构的 cloudflared 软件包
@@ -164,7 +165,6 @@ RUN curl -L --output cloudflared.deb "https://github.com/cloudflare/cloudflared/
 
 
 # 7️⃣ 🚀 动态判断架构并安装 VeraCrypt Console
-ARG TARGETARCH
 RUN VERA_VER="1.26.29" && \
     curl -L --output veracrypt.deb "https://github.com/veracrypt/VeraCrypt/releases/download/VeraCrypt_${VERA_VER}/veracrypt-console-${VERA_VER}-Debian-13-${TARGETARCH}.deb" && \
     apt-get update && \
@@ -219,8 +219,8 @@ RUN PUBLIC_DIR="/app/public" && \
 
 # 1️⃣2️⃣ 🐍 配置 Python 3.12 虚拟环境并使用 uv 零缓存安装依赖
 ENV VIRTUAL_ENV=/root/.python-env
-RUN uv python install 3.12.13 && \
-    uv venv --python 3.12.13 $VIRTUAL_ENV && \
+RUN uv python install 3.12 && \
+    uv venv --python 3.12 $VIRTUAL_ENV && \
     uv pip install --no-cache \
         "requests[socks]" \
         google_auth_oauthlib \
