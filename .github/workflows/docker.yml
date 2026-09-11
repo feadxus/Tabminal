@@ -44,15 +44,19 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          # 1️⃣ 修改：指向你自己的 Docker Hub 用户名 
           images: ${{ secrets.DOCKERHUB_USERNAME }}/tabminal
+          # 🎯 精简 Tag 生成规则:
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
+            # 1. 只有打 Git Tag (如 v1.2.3) 时,才生成 1.2.3 和 1.2 标签
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha
+            # 2. 无论什么情况,最终都只生成或更新一个干净的 latest 标签
             type=raw,value=latest
+          # 🚫 禁用架构后缀(防止产生 -amd64 / -arm64 等独立标签)
+          flavor: |
+            latest=auto
+            prefix=
+            suffix=
 
       - name: Resolve npm package artifact
         id: npm
@@ -91,7 +95,7 @@ jobs:
           echo "Waiting for tabminal@$TARGET_VERSION"
           echo "Expecting artifact: $PACKAGE_SPEC"
           
-          # 2️⃣ 修改：如果是手动触发或 Fork 仓库测试，跳过强行等待未发布的 tgz 包
+          # 2️⃣ 修改:如果是手动触发或 Fork 仓库测试,跳过强行等待未发布的 tgz 包
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "Workflow dispatched manually. Using default npm spec: tabminal"
             exit 0
@@ -108,7 +112,7 @@ jobs:
           done
           echo "Warning: Artifact not found on npm, falling back to latest npm package."
 
-      # 🔍【新增步骤 1】先在本地构建一个测试镜像（不推送到 Docker Hub）
+      # 🔍 先在本地构建一个测试镜像(不推送到 Docker Hub)
       - name: Build local container for testing
         uses: docker/build-push-action@v6
         with:
@@ -116,32 +120,32 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64
           push: false
-          load: true # 👈 关键：允许在接下来的步骤中直接用 docker run 运行它
+          load: true # 👈 关键:允许在接下来的步骤中直接用 docker run 运行它
           tags: tabminal-test:local
           build-args: |
             TABMINAL_NPM_SPEC=${{ github.event_name == 'workflow_dispatch' && 'tabminal' || steps.npm.outputs.package_spec }}
           cache-from: type=gha
 
-      # 🔍【新增步骤 2】让测试镜像后台运行 5 秒钟，检查它会不会报 MODULE_NOT_FOUND 错误
+      # 🔍 让测试镜像后台运行 5 秒钟,检查它会不会报 MODULE_NOT_FOUND 错误
       - name: Test container startup (Smoke Test)
         run: |
           echo "=== 启动临时容器测试 ==="
           docker run --name test-container -d tabminal-test:local --help
           
-          # 让 Node.js 跑 5 秒钟，以便它加载文件结构
+          # 让 Node.js 跑 5 秒钟,以便它加载文件结构
           sleep 5
           
           echo "=== 打印容器日志进行校验 ==="
           docker logs test-container
           
-          # 核心判定：如果日志里包含任何找不到模块的错误，就直接熔断报错，中断发布
+          # 核心判定:如果日志里包含任何找不到模块的错误,就直接熔断报错,中断发布
           if docker logs test-container 2>&1 | grep -qE "Cannot find module|Error"; then
-            echo "❌ 冒烟测试失败：检测到文件缺失或启动错误！"
+            echo "❌ 冒烟测试失败:检测到文件缺失或启动错误！"
             docker rm -f test-container
             exit 1
           fi
           
-          echo "✅ 冒烟测试通过：容器运行正常，未发现找不到模块的错误。"
+          echo "✅ 冒烟测试通过:容器运行正常,未发现找不到模块的错误."
           docker rm -f test-container
 
       - name: Build and push Docker image
@@ -149,10 +153,10 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          # 3️⃣ 核心修改：明确指定构建多架构 (amd64 和 arm64)
+          # 3️⃣ 核心修改:明确指定构建多架构 (amd64 和 arm64)
           platforms: linux/amd64,linux/arm64
           push: true
-          # 4️⃣ 核心修改：禁用 provenance，保证 latest 标签完整包含双架构
+          # 4️⃣ 核心修改:禁用 provenance,保证 latest 标签完整包含双架构
           provenance: false
           build-args: |
             TABMINAL_NPM_SPEC=${{ github.event_name == 'workflow_dispatch' && 'tabminal' || steps.npm.outputs.package_spec }}
