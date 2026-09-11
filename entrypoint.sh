@@ -18,7 +18,7 @@ echo "=== OpenSSH 服务已在 22 端口后台启动 ==="
 # 5️⃣. 判断传进来的第一个参数:
 # 如果传入的第一个参数是以 "-" 开头的(比如 Docker Compose 里的 --accept-terms ...)
 # 或者第一个参数不是 tabminal 命令本身,我们就把 "tabminal" 自动拼在最前面!
-if [ "${1#-}" != "$1" ]; then
+if [ "$1" != "tabminal" ]; then
     set -- tabminal "$@"
 fi
 
