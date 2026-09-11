@@ -5,11 +5,21 @@ ARG TARGETARCH
 
 WORKDIR /app
 
-# 显式声明时区变量,供后文 $TZ 引用
-ENV TZ=Australia/Perth
+# 1. 在 RUN 之前全局声明时区和非交互模式
+ENV TZ=Australia/Perth \
+    DEBIAN_FRONTEND=noninteractive
 
-# 2️⃣ 安装原生物料编译 (node-pty 必须) Python/Gtk/Cairo 开发依赖包及 OpenSSH 服务
-RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    gnupg \
+    # 添加 GitHub CLI 官方源
+    && mkdir -p /usr/share/keyrings \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
+    # 刷新软件源,统一安装所有工具
+    && apt-get update && apt-get install -y --no-install-recommends \
     # 1. 基础 Python & C/C++ 编译环境
     python3 \
     python3-dev \
@@ -25,7 +35,6 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y --no-ins
     openssh-server \
     openssh-client \
     netcat-openbsd \
-    knot-dnsutils \
     dnsutils \
     iputils-ping \
     traceroute \
@@ -35,11 +44,11 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y --no-ins
     socat \
     nmap \
     mtr \
-    curl \
     wget \
-    ca-certificates \
     age \
     # 3. 运维文本与压缩归档工具
+    git \
+    gh \
     vim-nox \
     locales \
     tzdata \
@@ -50,24 +59,25 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y --no-ins
     tini \
     jq \
     zsh \
-    git \
     xz-utils \
     unzip \
     zip \
     bzip2 \
     gzip \
+    tmux \
     tar \
     # 4. 配置时区与 Locale
     && echo "$TZ" > /etc/timezone \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
-    && sed -i -e 's/# zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/' /etc/locale.gen \
+    && sed -i -e 's/# zh_CN.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
     && locale-gen \
     && update-ca-certificates \
+    # 5. 彻底清理缓存
     && rm -rf /var/lib/apt/lists/*
 
 
-# 3️⃣. 配置 vim 与 zsh
+# 3️⃣. 配置 vim 和 zsh 与 eza
 # ==========================================
 # 1. 配置 vim 亮眼高亮与自动补全插件
 # ==========================================
@@ -100,10 +110,22 @@ RUN git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.
 RUN sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/g' ~/.zshrc && \
     sed -i 's/ZSH_THEME="robbyrussell"/ZSH_THEME="ys"/g' ~/.zshrc
 
-
 # 5. 设置 zsh 为默认 Shell
 SHELL ["/bin/zsh", "-c"]
 ENV SHELL=/bin/zsh
+
+# 多架构自动下载 eza
+ARG TARGETARCH
+RUN case "${TARGETARCH}" in \
+        "amd64") EZA_ARCH="x86_64-unknown-linux-gnu" ;; \
+        "arm64") EZA_ARCH="aarch64-unknown-linux-gnu" ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+    esac && \
+    curl -L -s -o eza.tar.gz "https://github.com/eza-community/eza/releases/download/v0.23.4/eza_${EZA_ARCH}.tar.gz" && \
+    tar -xzf eza.tar.gz && \
+    chmod +x ./eza && \
+    mv ./eza /usr/local/bin/ && \
+    rm eza.tar.gz
 
 
 # 4️⃣ 配置 SSH 目录 / 密钥及权限(SSH 对文件权限要求极严,必须为 700 / 600)
