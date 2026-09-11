@@ -1,6 +1,6 @@
 FROM node:latest
 
-# 1️⃣ 声明架构变量(Docker Buildx 自动注入为 amd64 或 arm64)
+# 1️⃣ 声明架构变量(Docker Buildx 自动注入为 amd64 或 arm64) 
 ARG TARGETARCH
 
 WORKDIR /app
