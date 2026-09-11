@@ -1,65 +1,69 @@
 FROM node:latest
 
-# 1️⃣ 声明架构变量(Docker Buildx 自动注入为 amd64 或 arm64) 
+# 1️⃣ 声明架构变量(Docker Buildx 自动注入为 amd64 或 arm64)
 ARG TARGETARCH
 
 WORKDIR /app
 
+# 显式声明时区变量,供后文 $TZ 引用
+ENV TZ=Australia/Perth
 
 # 2️⃣ 安装原生物料编译(node-pty 必须)、Python/Gtk/Cairo 开发依赖包及 OpenSSH 服务
-RUN apt-get update && apt-get install -y \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y --no-install-recommends \
+    # 1. 基础 Python & C/C++ 编译环境
     python3 \
     python3-dev \
     build-essential \
     pkg-config \
-    libgirepository1.0-dev \
     libgirepository-2.0-dev \
-    gir1.2-gtk-4.0 \
     libcairo2-dev \
     gir1.2-gtk-3.0 \
+    gir1.2-gtk-4.0 \
+    make \
+    # 2. 网络诊断抓包与安全工具
+    wireguard-tools \
     openssh-server \
     openssh-client \
-    wireguard-tools \
     netcat-openbsd \
     knot-dnsutils \
+    dnsutils \
     iputils-ping \
     traceroute \
-    dnsutils \
-    xz-utils \
     iproute2 \
     tcpdump \
+    tshark \
+    socat \
+    nmap \
+    mtr \
+    curl \
+    wget \
+    ca-certificates \
+    age \
+    # 3. 运维文本与压缩归档工具
     vim-nox \
     locales \
-    tshark \
+    tzdata \
     screen \
     direnv \
-    tzdata \
+    htop \
+    tree \
+    tini \
+    jq \
+    zsh \
+    git \
+    xz-utils \
     unzip \
-    socat \
+    zip \
     bzip2 \
     gzip \
-    curl \
-    make \
-    wget \
-    knot \
-    nmap \
-    htop \
-    tini \
-    tree \
-    lzma \
-    g++ \
-    age \
-    zip \
     tar \
-    git \
-    mtr \
-    zsh \
-    jq \
-    && echo "Australia/Perth" > /etc/timezone \
+    # 4. 配置时区与 Locale
+    && echo "$TZ" > /etc/timezone \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
     && sed -i -e 's/# zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/' /etc/locale.gen \
     && locale-gen \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 
@@ -124,9 +128,9 @@ RUN curl -L --output cloudflared.deb "https://github.com/cloudflare/cloudflared/
 
 # 7️⃣ 🚀 动态判断架构并安装 VeraCrypt Console
 RUN case "${TARGETARCH}" in \
-        "amd64") VERA_ARCH="amd64" ;; \
-        "arm64") VERA_ARCH="arm64" ;; \
-        *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+        "amd64")VERA_ARCH="amd64" ;; \
+        "arm64")VERA_ARCH="arm64" ;; \
+        *)echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
     esac && \
     VERA_DEB="veracrypt-console-1.26.29-Debian-13-${VERA_ARCH}.deb" && \
     curl -L --output "${VERA_DEB}" "https://github.com/veracrypt/VeraCrypt/releases/download/VeraCrypt_1.26.29/${VERA_DEB}" && \
