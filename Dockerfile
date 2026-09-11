@@ -8,7 +8,7 @@ WORKDIR /app
 # 显式声明时区变量,供后文 $TZ 引用
 ENV TZ=Australia/Perth
 
-# 2️⃣ 安装原生物料编译(node-pty 必须)、Python/Gtk/Cairo 开发依赖包及 OpenSSH 服务
+# 2️⃣ 安装原生物料编译 (node-pty 必须) Python/Gtk/Cairo 开发依赖包及 OpenSSH 服务
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y --no-install-recommends \
     # 1. 基础 Python & C/C++ 编译环境
     python3 \
