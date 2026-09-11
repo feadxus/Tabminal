@@ -26,10 +26,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
     libgirepository-2.0-dev \
+    libgirepository1.0-dev \
     libcairo2-dev \
     gir1.2-gtk-3.0 \
     gir1.2-gtk-4.0 \
     make \
+    gcc \
+    patchelf \
     # 2. 网络诊断抓包与安全工具
     wireguard-tools \
     openssh-server \
@@ -148,8 +151,10 @@ COPY authorized_keys /root/.ssh/authorized_keys
 RUN chmod 600 /root/.ssh/authorized_keys
 
 
-# 5️⃣ 优雅安装 uv(直接从官方镜像提取二进制,自动适配多架构)
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# 5️⃣ 使用官方脚本一键安装 uv (自动适配 amd64 / arm64)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+# 仅配置 uv 及其全局工具所在的标准路径
+ENV PATH="/root/.local/bin:$PATH"
 
 
 # 6️⃣ 动态下载对应架构的 cloudflared 软件包
@@ -159,15 +164,13 @@ RUN curl -L --output cloudflared.deb "https://github.com/cloudflare/cloudflared/
 
 
 # 7️⃣ 🚀 动态判断架构并安装 VeraCrypt Console
-RUN case "${TARGETARCH}" in \
-        "amd64")VERA_ARCH="amd64" ;; \
-        "arm64")VERA_ARCH="arm64" ;; \
-        *)echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
-    esac && \
-    VERA_DEB="veracrypt-console-1.26.29-Debian-13-${VERA_ARCH}.deb" && \
-    curl -L --output "${VERA_DEB}" "https://github.com/veracrypt/VeraCrypt/releases/download/VeraCrypt_1.26.29/${VERA_DEB}" && \
-    dpkg -i "${VERA_DEB}" || apt-get install -f -y && \
-    rm -f "${VERA_DEB}"
+ARG TARGETARCH
+RUN VERA_VER="1.26.29" && \
+    curl -L --output veracrypt.deb "https://github.com/veracrypt/VeraCrypt/releases/download/VeraCrypt_${VERA_VER}/veracrypt-console-${VERA_VER}-Debian-13-${TARGETARCH}.deb" && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends ./veracrypt.deb && \
+    rm veracrypt.deb && \
+    rm -rf /var/lib/apt/lists/*
 
 
 # 8️⃣ 复制项目目录并提前安装 Node 依赖
@@ -216,11 +219,12 @@ RUN PUBLIC_DIR="/app/public" && \
 
 # 1️⃣2️⃣ 🐍 配置 Python 3.12 虚拟环境并使用 uv 零缓存安装依赖
 ENV VIRTUAL_ENV=/root/.python-env
-RUN uv python install 3.12 && \
-    uv venv $VIRTUAL_ENV && \
+RUN uv python install 3.12.13 && \
+    uv venv --python 3.12.13 $VIRTUAL_ENV && \
     uv pip install --no-cache \
         "requests[socks]" \
         google_auth_oauthlib \
+        google-auth-httplib2 \
         ruamel.yaml \
         playwright \
         archivebox \
@@ -245,6 +249,7 @@ RUN uv python install 3.12 && \
         httpx \
         google-api-python-client \
         google-auth-oauthlib \
+        nuitka \
         bcc \
         browser-use \
         PyGObject && \
