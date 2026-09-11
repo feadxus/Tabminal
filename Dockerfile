@@ -63,6 +63,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zsh \
     xz-utils \
     unzip \
+    which \
+    procps \
+    telnet \
+    sudo \
+    lsof \
     zip \
     bzip2 \
     gzip \
