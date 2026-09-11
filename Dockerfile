@@ -66,6 +66,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gzip \
     tmux \
     tar \
+    fzf \
+    bat \
+    fd-find \
     # 4. 配置时区与 Locale
     && echo "$TZ" > /etc/timezone \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
