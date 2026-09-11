@@ -5,6 +5,7 @@ ARG TARGETARCH
 
 WORKDIR /app
 
+
 # 2️⃣ 安装原生物料编译(node-pty 必须)、Python/Gtk/Cairo 开发依赖包及 OpenSSH 服务
 RUN apt-get update && apt-get install -y \
     python3 \
@@ -16,43 +17,92 @@ RUN apt-get update && apt-get install -y \
     gir1.2-gtk-4.0 \
     libcairo2-dev \
     gir1.2-gtk-3.0 \
-    make \
-    age \
-    g++ \
-    curl \
-    direnv \
     openssh-server \
     openssh-client \
-    unzip \
-    zip \
-    tar \
-    gzip \
-    bzip2 \
-    xz-utils \
-    lzma \
-    iproute2 \
-    knot \
-    knot-dnsutils \
-    nmap \
-    netcat-openbsd \
-    socat \
-    tcpdump \
-    tshark \
     wireguard-tools \
+    netcat-openbsd \
+    knot-dnsutils \
     iputils-ping \
     traceroute \
-    mtr \
-    wget \
     dnsutils \
+    xz-utils \
+    iproute2 \
+    tcpdump \
     vim-nox \
-    git \
-    htop \
+    locales \
+    tshark \
     screen \
+    direnv \
+    tzdata \
+    unzip \
+    socat \
+    bzip2 \
+    gzip \
+    curl \
+    make \
+    wget \
+    knot \
+    nmap \
+    htop \
+    tini \
     tree \
+    lzma \
+    g++ \
+    age \
+    zip \
+    tar \
+    git \
+    mtr \
+    zsh \
     jq \
+    && echo "Australia/Perth" > /etc/timezone \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
+    && sed -i -e 's/# zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/' /etc/locale.gen \
+    && locale-gen \
     && rm -rf /var/lib/apt/lists/*
 
-# 3️⃣ 配置 SSH 目录 / 密钥及权限(SSH 对文件权限要求极严,必须为 700 / 600)
+
+# 3️⃣. 配置 vim 与 zsh
+# ==========================================
+# 1. 配置 vim 亮眼高亮与自动补全插件
+# ==========================================
+# 1. 设置系统全局环境变量为 UTF-8
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8
+
+# 2. 下载安装 vim-plug 插件管理器
+RUN curl -fLo /root/.vim/autoload/plug.vim --create-dirs \
+    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+
+# 3. 复制配置好的 .vimrc 到容器根目录
+COPY .vimrc /root/.vimrc
+
+# 4. 在 Docker 构建阶段自动预装所有 Vim 插件(静默安装并自动退出)
+RUN vim +PlugInstall +qall
+
+# ==========================================
+# 2. 配置 Zsh + Oh My Zsh + 亮眼高亮与自动补全插件
+# ==========================================
+# 1. 安装 Oh My Zsh (静默安装)
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+
+# 3. 安装 Fish 风格的自动补全与语法高亮插件
+RUN git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions && \
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
+
+# 4. # 修改 .zshrc，启用插件并将主题设置为非常亮眼的 "agnoster" 或 "ys"
+RUN sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/g' ~/.zshrc && \
+    sed -i 's/ZSH_THEME="robbyrussell"/ZSH_THEME="ys"/g' ~/.zshrc
+
+
+# 5. 设置 zsh 为默认 Shell
+SHELL ["/bin/zsh", "-c"]
+ENV SHELL=/bin/zsh
+
+
+# 4️⃣ 配置 SSH 目录 / 密钥及权限(SSH 对文件权限要求极严,必须为 700 / 600)
 RUN mkdir -p /var/run/sshd /root/.ssh && \
     chmod 700 /root/.ssh
 
@@ -61,15 +111,18 @@ COPY authorized_keys /root/.ssh/authorized_keys
 
 RUN chmod 600 /root/.ssh/authorized_keys
 
-# 4️⃣ 优雅安装 uv(直接从官方镜像提取二进制,自动适配多架构)
+
+# 5️⃣ 优雅安装 uv(直接从官方镜像提取二进制,自动适配多架构)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# 5️⃣ 动态下载对应架构的 cloudflared 软件包
+
+# 6️⃣ 动态下载对应架构的 cloudflared 软件包
 RUN curl -L --output cloudflared.deb "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${TARGETARCH}.deb" && \
     dpkg -i cloudflared.deb && \
     rm cloudflared.deb
 
-# 6️⃣ 🚀 动态判断架构并安装 VeraCrypt Console
+
+# 7️⃣ 🚀 动态判断架构并安装 VeraCrypt Console
 RUN case "${TARGETARCH}" in \
         "amd64") VERA_ARCH="amd64" ;; \
         "arm64") VERA_ARCH="arm64" ;; \
@@ -80,17 +133,21 @@ RUN case "${TARGETARCH}" in \
     dpkg -i "${VERA_DEB}" || apt-get install -f -y && \
     rm -f "${VERA_DEB}"
 
-# 7️⃣ 复制项目目录并提前安装 Node 依赖
+
+# 8️⃣ 复制项目目录并提前安装 Node 依赖
 COPY package*.json ./
 RUN npm install
 
-# 8️⃣ 复制剩余全部源码(包含 entrypoint.sh)
+
+# 9️⃣ 复制剩余全部源码(包含 entrypoint.sh)
 COPY . .
 
-# 9️⃣ 给入口脚本赋予执行权限
+
+# 🔟 给入口脚本赋予执行权限
 RUN chmod +x /app/entrypoint.sh
 
-# 🔟 离线静态资源自动化下载与注入
+
+# 1️⃣1️⃣ 离线静态资源自动化下载与注入
 RUN PUBLIC_DIR="/app/public" && \
     MODULES_DIR="${PUBLIC_DIR}/modules" && \
     mkdir -p "${MODULES_DIR}" && \
@@ -120,7 +177,8 @@ RUN PUBLIC_DIR="/app/public" && \
     sed -i "s|https://cdn.jsdelivr.net/npm/monaco-editor@[^/]*/min/vs/loader.js|/modules/vs/loader.js|g" "${PUBLIC_DIR}/index.html" && \
     sed -i "s|@import url('https://cdn.jsdelivr.net/npm/@xterm/xterm@[^']*/css/xterm.css');|@import url('/modules/xterm.css');|g" "${PUBLIC_DIR}/styles.css"
 
-# 11️⃣ 🐍 配置 Python 3.12 虚拟环境并使用 uv 零缓存安装依赖
+
+# 1️⃣2️⃣ 🐍 配置 Python 3.12 虚拟环境并使用 uv 零缓存安装依赖
 ENV VIRTUAL_ENV=/root/.python-env
 RUN uv python install 3.12 && \
     uv venv $VIRTUAL_ENV && \
@@ -156,13 +214,16 @@ RUN uv python install 3.12 && \
         PyGObject && \
     rm -rf /root/.cache/uv
 
-# 1️⃣2️⃣ 将 Python 虚拟环境加入 PATH
+
+# 1️⃣3️⃣ 将 Python 虚拟环境加入 PATH
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# 1️⃣3️⃣ 编译 Node 打包工具产物
+
+# 1️⃣4️⃣ 编译 Node 打包工具产物
 RUN npm run build && npm cache clean --force
 
-# 1️⃣4️⃣ 全局软链接二进制文件
+
+# 1️⃣5️⃣ 全局软链接二进制文件
 RUN npm link
 
 # 暴露 SSH 12345 端口和 Tabminal 9846 端口
