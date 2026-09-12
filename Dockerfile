@@ -50,7 +50,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nmap \
     mtr \
     wget \
-    age \
     # 3. 运维文本与压缩归档工具
     git \
     gh \
@@ -141,6 +140,18 @@ RUN case "${TARGETARCH}" in \
     chmod +x ./eza && \
     mv ./eza /usr/local/bin/ && \
     rm eza.tar.gz
+
+# 自动匹配架构下载并安装 age
+RUN case "${TARGETARCH}" in \
+        "amd64") AGE_ARCH="linux-amd64" ;; \
+        "arm64") AGE_ARCH="linux-arm64" ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+    esac && \
+    curl -L -s -o age.tar.gz "https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-${AGE_ARCH}.tar.gz" && \
+    tar -xzf age.tar.gz && \
+    chmod +x age/age age/age-keygen && \
+    mv age/age age/age-keygen /usr/local/bin/ && \
+    rm -rf age.tar.gz age/
 
 
 # 4️⃣ 配置 SSH 目录 / 密钥及权限(SSH 对文件权限要求极严,必须为 700 / 600)
