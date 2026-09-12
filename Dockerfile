@@ -30,7 +30,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2-dev \
     gir1.2-gtk-3.0 \
     gir1.2-gtk-4.0 \
+    binutils \
+    ccache \
+    clang \
     make \
+    lld \
     gcc \
     patchelf \
     # 2. 网络诊断抓包与安全工具
@@ -254,6 +258,7 @@ RUN uv python install 3.12 && \
         pytest \
         pandas \
         cython \
+        pyarmor \
         scapy \
         "litellm[proxy]" \
         huggingface_hub \
