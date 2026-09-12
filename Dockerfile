@@ -63,6 +63,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tree \
     tini \
     jq \
+    yq \
     zsh \
     xz-utils \
     unzip \
