@@ -139,7 +139,7 @@ RUN uv python install 3.12 && \
     uv pip install --no-cache \
         "requests[socks]" \
         google-api-python-client \
-        google-auth-oauthlib \
+        google-auth-oauthlib && \
     rm -rf /root/.cache/uv
 
 
