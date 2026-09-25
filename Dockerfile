@@ -1,3 +1,10 @@
+📜 创建 Dockerfile 制作镜像脚本
+
+📌 作用:
+	✔️ 提示:
+🪄 配置
+Dockerfile
+	✍️ 添加
 FROM node:latest
 
 # 1️⃣ 声明架构变量(Docker Buildx 自动注入为 amd64 或 arm64)
@@ -11,6 +18,8 @@ ENV TZ=Australia/Perth \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    ca-certificates \
+    gnupg \
     # 添加 GitHub CLI 官方源
     && mkdir -p /usr/share/keyrings \
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
@@ -18,34 +27,132 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
     # 刷新软件源,统一安装所有工具
     && apt-get update && apt-get install -y --no-install-recommends \
-    wget \
-    pkg-config \
-    libgirepository1.0-dev \
-    libgirepository-2.0-dev \
+    # 1. 基础 Python & C/C++ 编译环境
+    python3 \
+    python3-dev \
     build-essential \
-    gir1.2-gtk-4.0 \
+    pkg-config \
+    libgirepository-2.0-dev \
+    libgirepository1.0-dev \
+    libcairo2-dev \
     gir1.2-gtk-3.0 \
+    gir1.2-gtk-4.0 \
+    secure-delete \
+    binutils \
+    upx-ucl \
+    ccache \
+    clang \
+    make \
+    lld \
+    gcc \
+    patchelf \
+    # 2. 网络诊断抓包与安全工具
+    wireguard-tools \
     openssh-server \
     openssh-client \
-    libcairo2-dev \
-    secure-delete \
-    python3-dev \
-    vim \
-    tar \
-    zsh \
-    fzf \
+    netcat-openbsd \
+    knot-dnsutils \
+    dnsutils \
+    iputils-ping \
+    traceroute \
+    net-tools \
+    iproute2 \
+    tcpdump \
+    tshark \
+    socat \
+    nmap \
+    mtr \
+    wget \
+    # 3. 运维文本与压缩归档工具
     git \
     gh \
+    vim-nox \
+    locales \
+    tzdata \
+    screen \
+    direnv \
+    htop \
+    tree \
+    tini \
+    jq \
+    yq \
+    zsh \
+    xz-utils \
+    unzip \
+    which \
+    procps \
+    telnet \
+    sudo \
+    lsof \
+    zip \
+    bzip2 \
+    gzip \
+    tmux \
+    tar \
+    fzf \
+    bat \
+    fd-find \
+    # 4. 配置时区与 Locale
+    && echo "$TZ" > /etc/timezone \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
+    && sed -i -e 's/# zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/' /etc/locale.gen \
+    && locale-gen \
+    && update-ca-certificates \
     # 5. 彻底清理缓存
     && rm -rf /var/lib/apt/lists/*
 
 
-# 3️⃣. 配置 zsh
+# 3️⃣. 配置 vim 和 zsh 与 eza
+# ==========================================
+# 1. 配置 vim 亮眼高亮与自动补全插件
+# ==========================================
+# 1. 设置系统全局环境变量为 UTF-8
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8
+
+# 2. 下载安装 vim-plug 插件管理器
+RUN curl -fLo /root/.vim/autoload/plug.vim --create-dirs \
+    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+
+# 3. 复制配置好的 .vimrc 到容器根目录
+COPY .vimrc /root/.vimrc
+
+# 4. 忽略 colorscheme 加载失败的错误并自动预装所有 Vim 插件
+RUN vim -es -u /root/.vimrc -c "PlugInstall" -c "qa!" || true
+
+# ==========================================
+# 2. 配置 Zsh + Oh My Zsh + 亮眼高亮与自动补全插件
+# ==========================================
+# 1. 安装 Oh My Zsh (静默安装)
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+
+# 3. 安装 Fish 风格的自动补全与语法高亮插件
+RUN git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions && \
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
+
+# 4. # 修改 .zshrc，启用插件并将主题设置为非常亮眼的 "agnoster" 或 "ys"
+RUN sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/g' ~/.zshrc && \
+    sed -i 's/ZSH_THEME="robbyrussell"/ZSH_THEME="ys"/g' ~/.zshrc
+
 # 5. 彻底将 root 用户的默认 Shell 更改为 zsh (修改 /etc/passwd)
 RUN chsh -s /bin/zsh root
 
 # 6. 保留环境变量 (供 tmux、screen 或第三方 CLI 工具识别)
 ENV SHELL=/bin/zsh
+
+# 多架构自动下载 eza
+RUN case "${TARGETARCH}" in \
+        "amd64") EZA_ARCH="x86_64-unknown-linux-gnu" ;; \
+        "arm64") EZA_ARCH="aarch64-unknown-linux-gnu" ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+    esac && \
+    curl -L -s -o eza.tar.gz "https://github.com/eza-community/eza/releases/download/v0.23.4/eza_${EZA_ARCH}.tar.gz" && \
+    tar -xzf eza.tar.gz && \
+    chmod +x ./eza && \
+    mv ./eza /usr/local/bin/ && \
+    rm eza.tar.gz
 
 # 自动匹配架构下载并安装 age
 RUN case "${TARGETARCH}" in \
@@ -141,8 +248,39 @@ RUN uv python install 3.12 && \
     uv venv --python 3.12 $VIRTUAL_ENV && \
     uv pip install --no-cache \
         "requests[socks]" \
+        google_auth_oauthlib \
+        google-auth-httplib2 \
+        ruamel.yaml \
+        playwright \
+        archivebox \
+        dnspython \
+        pyperclip \
+        zstandard \
+        asciidoc \
+        httpstat \
+        aiofiles \
+        watchdog \
+        schedule \
+        PySocks \
+        pyyaml \
+        geoip2 \
+        yt-dlp \
+        pytest \
+        pandas \
+        cython \
+        pyarmor \
+        scapy \
+        "litellm[proxy]" \
+        huggingface_hub \
+        hf_transfer \
+        mitmproxy \
+        httpx \
         google-api-python-client \
-        google-auth-oauthlib && \
+        google-auth-oauthlib \
+        nuitka \
+        bcc \
+        browser-use \
+        PyGObject && \
     rm -rf /root/.cache/uv
 
 
@@ -165,3 +303,4 @@ ENTRYPOINT ["/app/entrypoint.sh"]
 
 # 默认 CMD 参数(如果 docker-compose 没有重写 command,就会用这个默认值)
 CMD ["tabminal", "--host", "0.0.0.0", "--port", "9846"]
+
