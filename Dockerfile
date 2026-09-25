@@ -1,10 +1,3 @@
-📜 创建 Dockerfile 制作镜像脚本
-
-📌 作用:
-	✔️ 提示:
-🪄 配置
-Dockerfile
-	✍️ 添加
 FROM node:latest
 
 # 1️⃣ 声明架构变量(Docker Buildx 自动注入为 amd64 或 arm64)
