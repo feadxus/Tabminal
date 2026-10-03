@@ -75,6 +75,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     which \
     procps \
     telnet \
+    fuse3 \
     sudo \
     lsof \
     zip \
@@ -85,6 +86,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fzf \
     bat \
     fd-find \
+    && curl -fsSL https://rclone.org/install.sh | bash \
+    && rclone version \
     # 4. 配置时区与 Locale
     && echo "$TZ" > /etc/timezone \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
@@ -159,6 +162,12 @@ RUN case "${TARGETARCH}" in \
     mv age/age age/age-keygen /usr/local/bin/ && \
     rm -rf age.tar.gz age/
 
+# 写入 rclone 配置文件
+RUN mkdir -p /root/.config/rclone
+COPY rclone.conf /root/.config/rclone/rclone.conf
+RUN chmod 600 /root/.config/rclone/rclone.conf \
+    && rclone config file \
+    && rclone version
 
 # 4️⃣ 配置 SSH 目录 / 密钥及权限(SSH 对文件权限要求极严,必须为 700 / 600)
 RUN mkdir -p /var/run/sshd /root/.ssh && \
@@ -296,4 +305,3 @@ ENTRYPOINT ["/app/entrypoint.sh"]
 
 # 默认 CMD 参数(如果 docker-compose 没有重写 command,就会用这个默认值)
 CMD ["tabminal", "--host", "0.0.0.0", "--port", "9846"]
-
