@@ -85,6 +85,15 @@ jobs:
           echo "target_version=$target_version" >> "$GITHUB_OUTPUT"
           echo "package_spec=$package_spec" >> "$GITHUB_OUTPUT"
 
+      - name: 创建 rclone 配置
+        env:
+          RCLONE_CONFIG_1: ${{ secrets.GOOGLE_FEADXUS_DRIVE }}
+          RCLONE_CONFIG_2: ${{ secrets.GOOGLE_FSXEDX_DRIVE }}
+        run: |
+          printf '%s\n' "$RCLONE_CONFIG_1" > rclone.conf
+          printf '%s\n' "$RCLONE_CONFIG_2" >> rclone.conf
+          chmod 600 rclone.conf
+
       - name: Wait for npm package artifact
         shell: bash
         env:
