@@ -211,7 +211,7 @@ def execute_gmail_action(action_type="send", file_name=None):
 
 # =============== 主流程 ===============
 def main():
-    encrypted_file_name = "tunnel_data.tar.xz.age"
+    encrypted_file_name = "Tabminal_data.tar.xz.age"
     try:
         # 环境初始化
         initialize_environment()
@@ -222,7 +222,7 @@ def main():
         # 使用 XZ 压缩并通过 age 加密
         compress_and_encrypt(CONFIG.BASE_DIR, encrypted_file_name)
         # 上传至 Google Drive
-        upload_to_gdrive(encrypted_file_name)
+        #upload_to_gdrive(encrypted_file_name)
         print("📧 开始拉起安全沙箱,组装发送邮件...", flush=True)
         execute_gmail_action(action_type="send", file_name=encrypted_file_name)
 
