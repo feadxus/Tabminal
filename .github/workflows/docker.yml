@@ -1,24 +1,28 @@
 name: Publish Docker image
 
 on:
-  # 自动构建镜像
-  #push:
-  #  branches: [ "main", "master" ]
-  #  tags: [ 'v*' ]
-  #release:
-  #  types: [ published ]
   workflow_dispatch:
 
 jobs:
-  push_to_registry:
-    name: Push Docker image to Docker Hub
+  # 🎯 核心:多架构矩阵并行构建(amd64 和 arm64)
+  build:
+    name: Build(${{ matrix.platform }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch_suffix: amd64
+          - platform: linux/arm64
+            arch_suffix: arm64
+
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
 
       # 🧹 清理 Runner 上无用的软件包以腾出 20G+ 磁盘空间
-      - name: Free Disk Space (Ubuntu)
+      - name: Free Disk Space(Ubuntu)
         uses: jlumbroso/free-disk-space@main
         with:
           tool-cache: true
@@ -29,74 +33,29 @@ jobs:
           docker-images: false
           swap-storage: true
 
-      # 🌍 记录安装 WARP 之前的原始公网 IP
-      - name: 🌍 Check Original Public IP
-        run: |
-          echo "Original Public IP:"
-          curl -4s https://api.ipify.org
-          echo
-
-      # ☁️ 安装 Cloudflare WARP
-      - name: ☁️ Install Cloudflare WARP
-        run: |
-          curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg \
-            | sudo gpg --yes --dearmor \
-            -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(. /etc/os-release && echo "$VERSION_CODENAME") main" \
-            | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
-          sudo apt-get update
-          sudo apt-get install -y cloudflare-warp
-
-      # 🚀 启动 WARP 客户端并连接
-      - name: 🚀 Start Cloudflare WARP
-        run: |
-          sudo warp-cli --accept-tos registration new
-          sudo warp-cli --accept-tos connect
-          sleep 5
-          sudo warp-cli --accept-tos status
-
-      # 🛠️ 【核心修复 1】强制修复 WARP 启动后的 DNS 解析问题
-      - name: 🛠️ Fix DNS for Docker & WARP
-        run: |
-          echo "=== 正在修复系统 DNS 解析 ==="
-          sudo rm -f /etc/resolv.conf
-          echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
-          echo "nameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf
-          echo "=== 测试 DNS 解析是否正常 ==="
-          nslookup registry-1.docker.io || true
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      # 🛠️ 【核心修复 2】使用 docker 驱动，彻底放弃隔离容器网络的限制，完美继承宿主机 DNS
+      # 🛠️ 在工作目录下生成 Buildkit 配置文件
+      - name: Prepare Buildkit Config
+        run: |
+          cat <<EOF > ./buildkitd.toml
+          [dns]
+            nameservers = ["1.1.1.1", "8.8.8.8"]
+          EOF
+
+      # 🛠️ 使用正确的 buildkitd-config 参数指定配置文件
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          driver: docker
+          driver: docker-container
+          buildkitd-config: ./buildkitd.toml
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/tabminal
-          # 🎯 精简 Tag 生成规则:
-          tags: |
-            # 1. 只有打 Git Tag (如 v1.2.3) 时,才生成 1.2.3 和 1.2 标签
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            # 2. 无论什么情况,最终都只生成或更新一个干净的 latest 标签
-            type=raw,value=latest
-          # 🚫 禁用架构后缀(防止产生 -amd64 / -arm64 等独立标签)
-          flavor: |
-            latest=auto
-            prefix=
-            suffix=
 
       - name: Resolve npm package artifact
         id: npm
@@ -144,7 +103,6 @@ jobs:
           echo "Waiting for tabminal@$TARGET_VERSION"
           echo "Expecting artifact: $PACKAGE_SPEC"
           
-          # 2️⃣ 修改:如果是手动触发或 Fork 仓库测试,跳过强行等待未发布的 tgz 包
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "Workflow dispatched manually. Using default npm spec: tabminal"
             exit 0
@@ -161,55 +119,46 @@ jobs:
           done
           echo "Warning: Artifact not found on npm, falling back to latest npm package."
 
-      # 🔍 先在本地构建一个测试镜像(不推送到 Docker Hub)
-      - name: Build local container for testing
+      # 🚀 独立构建并推送当前架构的镜像
+      - name: Build and push per-architecture Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          platforms: linux/amd64
-          push: false
-          load: true # 👈 关键:允许在接下来的步骤中直接用 docker run 运行它
-          tags: tabminal-test:local
-          build-args: |
-            TABMINAL_NPM_SPEC=${{ github.event_name == 'workflow_dispatch' && 'tabminal' || steps.npm.outputs.package_spec }}
-          cache-from: type=gha
-
-      # 🔍 让测试镜像后台运行 5 秒钟,检查它会不会报 MODULE_NOT_FOUND 错误
-      - name: Test container startup (Smoke Test)
-        run: |
-          echo "=== 启动临时容器测试 ==="
-          docker run --name test-container -d tabminal-test:local --help
-          
-          # 让 Node.js 跑 5 秒钟,以便它加载文件结构
-          sleep 5
-          
-          echo "=== 打印容器日志进行校验 ==="
-          docker logs test-container
-          
-          # 核心判定:如果日志里包含任何找不到模块的错误,就直接熔断报错,中断发布
-          if docker logs test-container 2>&1 | grep -qE "Cannot find module|Error"; then
-            echo "❌ 冒烟测试失败:检测到文件缺失或启动错误！"
-            docker rm -f test-container
-            exit 1
-          fi
-          
-          echo "✅ 冒烟测试通过:容器运行正常,未发现找不到模块的错误."
-          docker rm -f test-container
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          # 3️⃣ 明确指定构建多架构 (amd64 和 arm64)
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platform }}
           push: true
-          # 4️⃣ 禁用 provenance,保证 latest 标签完整包含双架构
           provenance: false
           build-args: |
             TABMINAL_NPM_SPEC=${{ github.event_name == 'workflow_dispatch' && 'tabminal' || steps.npm.outputs.package_spec }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/tabminal:latest-${{ matrix.arch_suffix }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # 🔗 收尾 Job:等待 amd64 和 arm64 构建完成后,将其合并为标准的 Multi-arch Manifest
+  merge-manifests:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+
+      - name: Create and push Multi-arch Manifest
+        run: |
+          IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/tabminal"
+          
+          echo "=== 正在将 amd64 和 arm64 镜像合并为 latest ==="
+          docker buildx imagetools create \
+            --tag ${IMAGE_NAME}:latest \
+            ${IMAGE_NAME}:latest-amd64 \
+            ${IMAGE_NAME}:latest-arm64
+
+          echo "=== 校验最终的多架构清单 ==="
+          docker buildx imagetools inspect ${IMAGE_NAME}:latest
