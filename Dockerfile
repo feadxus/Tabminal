@@ -5,19 +5,6 @@ ARG TARGETARCH
 
 WORKDIR /app
 
-# 主仓库指向 kernel.org 镜像，安全源指向官方 security.debian.org（解决 404 报错）
-RUN echo "Types: deb\n\
-URIs: https://mirrors.kernel.org/debian\n\
-Suites: trixie trixie-updates\n\
-Components: main contrib non-free non-free-firmware\n\
-Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg\n\
-\n\
-Types: deb\n\
-URIs: https://security.debian.org/debian-security\n\
-Suites: trixie-security\n\
-Components: main contrib non-free non-free-firmware\n\
-Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" > /etc/apt/sources.list.d/debian.sources
-
 # 1. 在 RUN 之前全局声明时区和非交互模式 
 ENV TZ=Australia/Perth \
     DEBIAN_FRONTEND=noninteractive
@@ -31,7 +18,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
-    # ========================================
     # 刷新软件源,统一安装所有工具
     && apt-get update && apt-get install -y --no-install-recommends \
     # 1. 基础 Python & C/C++ 编译环境
@@ -69,7 +55,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     socat \
     nmap \
     mtr \
-    tor \
     wget \
     # 3. 运维文本与压缩归档工具
     git \
