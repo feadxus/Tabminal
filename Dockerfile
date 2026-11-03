@@ -5,6 +5,19 @@ ARG TARGETARCH
 
 WORKDIR /app
 
+# 主仓库指向 kernel.org 镜像，安全源指向官方 security.debian.org（解决 404 报错）
+RUN echo "Types: deb\n\
+URIs: https://mirrors.kernel.org/debian\n\
+Suites: trixie trixie-updates\n\
+Components: main contrib non-free non-free-firmware\n\
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg\n\
+\n\
+Types: deb\n\
+URIs: https://security.debian.org/debian-security\n\
+Suites: trixie-security\n\
+Components: main contrib non-free non-free-firmware\n\
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" > /etc/apt/sources.list.d/debian.sources
+
 # 1. 在 RUN 之前全局声明时区和非交互模式 
 ENV TZ=Australia/Perth \
     DEBIAN_FRONTEND=noninteractive
@@ -62,6 +75,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     socat \
     nmap \
     mtr \
+    tor \
     wget \
     cloudflare-warp \
     # 3. 运维文本与压缩归档工具
@@ -312,4 +326,4 @@ EXPOSE 12345 9846
 ENTRYPOINT ["/app/entrypoint.sh"]
 
 # 默认 CMD 参数(如果 docker-compose 没有重写 command,就会用这个默认值)
-CMD ["tabminal", "--host", "0.0.0.0", "--port", "9846"]
+CMD ["tabminal", "--host", "0.0.0.0", "--port", "9846"]g
