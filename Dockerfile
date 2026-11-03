@@ -31,12 +31,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
-    # === 添加 Cloudflare WARP 官方源及密钥 ===
-    && curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg \
-       | gpg --yes --dearmor \
-       -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(. /etc/os-release && echo "$VERSION_CODENAME") main" \
-       > /etc/apt/sources.list.d/cloudflare-client.list \
     # ========================================
     # 刷新软件源,统一安装所有工具
     && apt-get update && apt-get install -y --no-install-recommends \
@@ -77,7 +71,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     mtr \
     tor \
     wget \
-    cloudflare-warp \
     # 3. 运维文本与压缩归档工具
     git \
     gh \
@@ -326,4 +319,4 @@ EXPOSE 12345 9846
 ENTRYPOINT ["/app/entrypoint.sh"]
 
 # 默认 CMD 参数(如果 docker-compose 没有重写 command,就会用这个默认值)
-CMD ["tabminal", "--host", "0.0.0.0", "--port", "9846"]g
+CMD ["tabminal", "--host", "0.0.0.0", "--port", "9846"]
